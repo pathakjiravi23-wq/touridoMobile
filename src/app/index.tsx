@@ -1,9 +1,9 @@
+import SearchProvider, { useSearch } from '@/components/search/search-provider';
 import DrawerProvider, { useDrawer } from '@/components/sidebar/drawer-provider';
 import TravelSidebar from '@/components/sidebar/travel-sidebar';
 import { Button } from '@/components/ui/button';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-
 import {
   Image,
   Pressable,
@@ -55,6 +55,8 @@ const posts = [
 ];
 
 function HomeContent() {
+
+  const { open: openSearch } = useSearch();
   const { toggle } = useDrawer();
   const [likedPosts, setLikedPosts] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState('For you');
@@ -89,6 +91,7 @@ function HomeContent() {
           </Text>
 
           <Pressable
+            onPress={openSearch}
             accessibilityRole="button"
             accessibilityLabel="Search"
             className="h-10 w-10 items-center justify-center rounded-full bg-gray-100"
@@ -107,8 +110,8 @@ function HomeContent() {
             >
               <Text
                 className={`text-sm ${activeTab === tab
-                    ? 'font-bold text-black'
-                    : 'font-medium text-gray-400'
+                  ? 'font-bold text-black'
+                  : 'font-medium text-gray-400'
                   }`}
               >
                 {tab}
@@ -267,8 +270,10 @@ function HomeContent() {
 
 export default function HomeScreen() {
   return (
-    <DrawerProvider drawer={<TravelSidebar />}>
-      <HomeContent />
-    </DrawerProvider>
+    <SearchProvider>
+      <DrawerProvider drawer={<TravelSidebar />}>
+        <HomeContent />
+      </DrawerProvider>
+    </SearchProvider>
   );
 }
