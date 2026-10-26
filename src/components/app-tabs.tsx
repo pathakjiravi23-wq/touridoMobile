@@ -9,6 +9,19 @@ const COLORS = {
   pill: '#F3F4F6',
 };
 
+// Single source of truth for the tab bar style.
+// messages-screen.tsx imports this to restore the bar after a chat closes.
+export const TAB_BAR_STYLE = {
+  backgroundColor: COLORS.background,
+  borderTopWidth: 0,
+  elevation: 0,
+  shadowOpacity: 0,
+  height: 62,
+  paddingTop: 8,
+  paddingBottom: 8,
+  display: 'flex' as const,
+};
+
 export default function AppTabs() {
   return (
     <Tabs
@@ -17,17 +30,10 @@ export default function AppTabs() {
         tabBarShowLabel: false,
         tabBarActiveTintColor: COLORS.active,
         tabBarInactiveTintColor: COLORS.inactive,
-        lazy: false,
-        tabBarStyle: {
-          backgroundColor: COLORS.background,
-          borderTopWidth: 0,
-          elevation: 0,
-          shadowOpacity: 0,
-          height: 62,
-          paddingTop: 8,
-          paddingBottom: 8,
+        tabBarStyle: TAB_BAR_STYLE,
+        tabBarItemStyle: {
+          justifyContent: 'center',
         },
-        tabBarItemStyle: { justifyContent: 'center' },
       }}
     >
       <Tabs.Screen
@@ -45,14 +51,14 @@ export default function AppTabs() {
       />
 
       <Tabs.Screen
-        name="communities"
+        name="messages"
         options={{
-          tabBarAccessibilityLabel: 'Communities',
+          tabBarAccessibilityLabel: 'Messages',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? 'people' : 'people-outline'}
+              name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
               color={color}
-              size={27}
+              size={26}
             />
           ),
         }}
@@ -97,7 +103,8 @@ export default function AppTabs() {
         }}
       />
 
-      <Tabs.Screen name="explore" options={{ href: null }} />
+
+      <Tabs.Screen name="call" options={{ href: null }} />
     </Tabs>
   );
 }
