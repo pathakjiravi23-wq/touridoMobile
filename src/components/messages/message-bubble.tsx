@@ -2,12 +2,13 @@ import VoiceMessage from '@/components/messages/voice-message';
 import type { ChatMessage } from '@/data/messages';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useVideoPlayer, type VideoThumbnail } from 'expo-video';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 type Props = {
     message: ChatMessage;
-    onOpenImage?: (message: ChatMessage) => void;
+    onOpenMedia?: (message: ChatMessage) => void;
 };
 
 const clamp = (n: number, min: number, max: number) =>
@@ -26,11 +27,7 @@ function ImageContent({ message, onOpen }: { message: ChatMessage; onOpen?: () =
     const [ratio, setRatio] = useState(1);
 
     return (
-        <Pressable
-            onPress={onOpen}
-            accessibilityRole="imagebutton"
-            accessibilityLabel="Open photo"
-        >
+        <Pressable onPress={onOpen} accessibilityRole="imagebutton" accessibilityLabel="Open photo">
             <View
                 className="overflow-hidden rounded-2xl bg-gray-200"
                 style={{ width: 240, aspectRatio: ratio }}
@@ -51,7 +48,62 @@ function ImageContent({ message, onOpen }: { message: ChatMessage; onOpen?: () =
     );
 }
 
-export default function MessageBubble({ message, onOpenImage }: Props) {
+function VideoContent({ message, onOpen }: { message: ChatMessage; onOpen?: () => void }) {
+    // This player is only used to grab a preview frame. It never plays in the bubble.
+    const player = useVideoPlayer(message.uri ?? null);
+    const [thumb, setThumb] = useState<VideoThumbnail | null>(null);
+
+    useEffect(() => {
+        let active = true;
+        let started = false;
+
+        async function generate() {
+            if (started) return;
+            started = true;
+            try {
+                const [frame] = await player.generateThumbnailsAsync([0.5]);
+                if (active && frame) setThumb(frame);
+            } catch {
+                // Falls back to the dark card below.
+            }
+        }
+
+        if (player.status === 'readyToPlay') generate();
+        const sub = player.addListener('statusChange', ({ status }) => {
+            if (status === 'readyToPlay') generate();
+        });
+
+        return () => {
+            active = false;
+            sub.remove();
+        };
+    }, [player]);
+
+    const ratio = thumb ? clamp(thumb.width / thumb.height, 0.75, 1.5) : 1.5;
+
+    return (
+        <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel="Play video">
+            <View
+                className="items-center justify-center overflow-hidden rounded-2xl bg-gray-800"
+                style={{ width: 240, aspectRatio: ratio }}
+            >
+                {thumb ? (
+                    <Image
+                        source={thumb}
+                        style={{ width: '100%', height: '100%', position: 'absolute' }}
+                        contentFit="cover"
+                    />
+                ) : null}
+                <View className="h-14 w-14 items-center justify-center rounded-full bg-black/50">
+                    <Ionicons name="play" size={28} color="#FFFFFF" />
+                </View>
+                <TimePill time={message.time} />
+            </View>
+        </Pressable>
+    );
+}
+
+export default function MessageBubble({ message, onOpenMedia }: Props) {
     const mine = message.fromMe;
     const textColor = mine ? 'text-white' : 'text-gray-900';
     const isMedia = message.type === 'image' || message.type === 'video';
@@ -59,31 +111,9 @@ export default function MessageBubble({ message, onOpenImage }: Props) {
     function renderContent() {
         switch (message.type) {
             case 'image':
-                return (
-                    <ImageContent
-                        message={message}
-                        onOpen={() => onOpenImage?.(message)}
-                    />
-                );
+                return <ImageContent message={message} onOpen={() => onOpenMedia?.(message)} />;
             case 'video':
-                // Placeholder card. Real playback needs expo-video (not installed yet).
-                return (
-                    <View
-                        className="items-center justify-center overflow-hidden rounded-2xl bg-gray-800"
-                        style={{ width: 240, height: 150 }}
-                    >
-                        <Ionicons name="play-circle" size={48} color="#FFFFFF" />
-                        {message.fileName ? (
-                            <Text
-                                numberOfLines={1}
-                                className="absolute bottom-2 left-3 max-w-[150px] text-xs text-white"
-                            >
-                                {message.fileName}
-                            </Text>
-                        ) : null}
-                        <TimePill time={message.time} />
-                    </View>
-                );
+                return <VideoContent message={message} onOpen={() => onOpenMedia?.(message)} />;
             case 'file':
                 return (
                     <View className="flex-row items-center">
@@ -115,9 +145,7 @@ export default function MessageBubble({ message, onOpenImage }: Props) {
                 {renderContent()}
             </View>
             {/* Photos and videos show the time on top of the media instead. */}
-            {!isMedia && (
-                <Text className="mt-1 text-[11px] text-gray-400">{message.time}</Text>
-            )}
+            {!isMedia && <Text className="mt-1 text-[11px] text-gray-400">{message.time}</Text>}
         </View>
     );
 }

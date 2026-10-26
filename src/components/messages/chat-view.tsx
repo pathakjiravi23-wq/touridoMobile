@@ -3,21 +3,24 @@ import {
     FlatList,
     Keyboard,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import CallScreen from '@/components/messages/call-screen';
 import ChatComposer from '@/components/messages/chat-composer';
 import ChatHeader from '@/components/messages/chat-header';
 import ChatSkeleton from '@/components/messages/chat-skeleton';
-import ImageViewer from '@/components/messages/image-viewer';
+import MediaViewer from '@/components/messages/media-viewer';
 import MessageBubble from '@/components/messages/message-bubble';
 import {
     CONVERSATIONS,
     type ChatMessage,
     type ChatUser,
 } from '@/data/messages';
+import { useCall } from '@/hooks/use-call';
 
 type Props = {
     user: ChatUser;
@@ -59,6 +62,7 @@ export default function ChatView({ user, onBack }: Props) {
     const [ready, setReady] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [viewing, setViewing] = useState<ChatMessage | null>(null);
+    const call = useCall();
 
     useEffect(() => {
         let mounted = true;
@@ -108,7 +112,11 @@ export default function ChatView({ user, onBack }: Props) {
 
     return (
         <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-            <ChatHeader user={user} onBack={onBack} />
+            <ChatHeader
+                user={user}
+                onBack={onBack}
+                onCall={() => call.startCall(user)}
+            />
 
             {/* The only keyboard-avoidance layer. */}
             <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
@@ -120,7 +128,7 @@ export default function ChatView({ user, onBack }: Props) {
                             inverted
                             keyExtractor={(item) => item.id}
                             renderItem={({ item }) => (
-                                <MessageBubble message={item} onOpenImage={setViewing} />
+                                <MessageBubble message={item} onOpenMedia={setViewing} />
                             )}
                             keyboardShouldPersistTaps="handled"
                             keyboardDismissMode={
@@ -162,11 +170,35 @@ export default function ChatView({ user, onBack }: Props) {
                 </View>
             </KeyboardAvoidingView>
 
-            <ImageViewer
+            <MediaViewer
                 message={viewing}
                 title={viewing?.fromMe ? 'You' : user.name}
                 onClose={() => setViewing(null)}
             />
+
+            {/* Call screen: full-screen overlay, no routing involved.
+                Android back button ends the call. */}
+            <Modal
+                visible={call.status !== 'idle'}
+                animationType="slide"
+                statusBarTranslucent
+                onRequestClose={call.endCall}
+            >
+                {call.user ? (
+                    <CallScreen
+                        user={call.user}
+                        status={call.status}
+                        seconds={call.seconds}
+                        muted={call.muted}
+                        speaker={call.speaker}
+                        endReason={call.endReason}
+                        demo={call.isMock}
+                        onEnd={call.endCall}
+                        onToggleMute={call.toggleMute}
+                        onToggleSpeaker={call.toggleSpeaker}
+                    />
+                ) : null}
+            </Modal>
         </View>
     );
 }

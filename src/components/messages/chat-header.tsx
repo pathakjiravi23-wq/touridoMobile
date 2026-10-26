@@ -3,9 +3,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Image, Pressable, Text, View } from 'react-native';
 
-type Props = { user: ChatUser; onBack: () => void };
+type Props = { user: ChatUser; onBack: () => void; onCall: () => void };
 
-export default function ChatHeader({ user, onBack }: Props) {
+export default function ChatHeader({ user, onBack, onCall }: Props) {
     const router = useRouter();
 
     return (
@@ -34,7 +34,7 @@ export default function ChatHeader({ user, onBack }: Props) {
             </View>
 
             <Pressable
-                onPress={() => router.push({ pathname: '/messages/call', params: { id: user.id } })}
+                onPress={onCall}
                 hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel="Call"

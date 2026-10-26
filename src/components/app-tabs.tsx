@@ -103,8 +103,6 @@ export default function AppTabs() {
         }}
       />
 
-
-      <Tabs.Screen name="call" options={{ href: null }} />
     </Tabs>
   );
 }
