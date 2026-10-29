@@ -1,4 +1,3 @@
-
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import {
@@ -7,113 +6,412 @@ import {
     ScrollView,
     Text,
     View,
+    useWindowDimensions,
 } from 'react-native';
+import Animated, {
+    Easing,
+    LinearTransition,
+    useAnimatedScrollHandler,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+const INK = '#0A0A0A';
+const MUTED = '#737373';
+
+const TABS = [
+    { key: 'Trips', cta: 'Start your first trip', hint: 'Trips you create or join will appear here.' },
+    { key: 'Posts', cta: 'Share your first adventure', hint: 'Your stories from the road will appear here.' },
+    { key: 'Media', cta: 'Add your first photo', hint: 'Your best frames from every journey.' },
+    { key: 'Saved', cta: 'Explore places', hint: 'Places and trips you save will appear here.' },
+] as const;
+
+const STATUSES = [
+    { emoji: '🏔️', label: 'Trekking' },
+    { emoji: '✈️', label: 'Travelling' },
+    { emoji: '🎒', label: 'Planning a trip' },
+    { emoji: '🏠', label: 'Home, ready to go' },
+];
+
+const SUGGESTIONS = [
+    { id: '1', name: 'Aarav Sharma', handle: 'aarav.travels', mutual: 12, avatar: 'https://i.pravatar.cc/200?img=12' },
+    { id: '2', name: 'Priya Das', handle: 'priya.explores', mutual: 8, avatar: 'https://i.pravatar.cc/200?img=47' },
+    { id: '3', name: 'Rohan Gupta', handle: 'rohan.ontheroad', mutual: 5, avatar: 'https://i.pravatar.cc/200?img=11' },
+    { id: '4', name: 'Sneha Roy', handle: 'sneha.wanders', mutual: 3, avatar: 'https://i.pravatar.cc/200?img=32' },
+];
+
+const CARD_W = 164;
+
+/** Eased 0 → 1 progress of `y` between `a` and `b`. Runs on the UI thread. */
+function prog(y: number, a: number, b: number) {
+    'worklet';
+    const t = Math.min(1, Math.max(0, (y - a) / (b - a)));
+    return 1 - Math.pow(1 - t, 3); // ease-out cubic
+}
+
+function SuggestionCard({
+    person,
+    requested,
+    onToggle,
+    onDismiss,
+}: {
+    person: (typeof SUGGESTIONS)[number];
+    requested: boolean;
+    onToggle: () => void;
+    onDismiss: () => void;
+}) {
+    return (
+        <Animated.View
+            // No enter/exit animation: the dismissed card vanishes instantly,
+            // the rest glide over with a plain timing curve (no spring = no wobble).
+            layout={LinearTransition.duration(260).easing(Easing.out(Easing.cubic))}
+            style={{ width: CARD_W }}
+            className="mr-3 items-center rounded-3xl border border-neutral-200 bg-neutral-50 px-3 pb-3 pt-6"
+        >
+            <Pressable
+                onPress={onDismiss}
+                hitSlop={12}
+                className="absolute right-3 top-3"
+                accessibilityLabel={`Dismiss ${person.name}`}
+            >
+                <Ionicons name="close" size={16} color="#A3A3A3" />
+            </Pressable>
+
+            <Image
+                source={{ uri: person.avatar }}
+                className="h-20 w-20 rounded-full border border-neutral-200 bg-neutral-100"
+            />
+
+            <Text numberOfLines={1} className="mt-3 text-base font-semibold text-neutral-950">
+                {person.name}
+            </Text>
+            <Text numberOfLines={1} className="mt-0.5 text-sm text-neutral-400">
+                {person.handle}
+            </Text>
+            <Text className="mt-1 text-xs text-neutral-500">{person.mutual} mutual connections</Text>
+
+            <Pressable
+                onPress={onToggle}
+                className={`mt-3 w-full items-center rounded-xl py-2.5 active:opacity-80 ${requested ? 'border border-neutral-300 bg-white' : 'bg-neutral-950'
+                    }`}
+            >
+                <Text className={`text-sm font-semibold ${requested ? 'text-neutral-500' : 'text-white'}`}>
+                    {requested ? 'Requested' : 'Connect'}
+                </Text>
+            </Pressable>
+        </Animated.View>
+    );
+}
+
 export default function ProfileScreen() {
-    const [activeTab, setActiveTab] = useState('Posts');
+    const { width, height } = useWindowDimensions();
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [people, setPeople] = useState(SUGGESTIONS);
+    const [requested, setRequested] = useState<string[]>([]);
+    const [statusIndex, setStatusIndex] = useState<number | null>(null);
+
+    const scrollY = useSharedValue(0);
+    const topH = useSharedValue(700); // height of header + suggestions (where tabs pin)
+    const tabsH = useSharedValue(54); // height of the tab bar
+    const viewH = useSharedValue(height); // visible height of the scroll area
+    const itemH = useSharedValue(90); // height of the centered empty-state item
+    const [viewHeight, setViewHeight] = useState(height * 0.8);
+    const tabW = width / TABS.length;
+    const indicatorX = useSharedValue(0);
+
+    const onScroll = useAnimatedScrollHandler((e) => {
+        scrollY.value = e.contentOffset.y;
+    });
+
+    // ---- Scroll-linked styles: everything is a continuous function of scrollY ----
+
+    // Top bar title fades/slides in as the big name leaves
+    const barTitle = useAnimatedStyle(() => {
+        const p = prog(scrollY.value, 70, 150);
+        return { opacity: p, transform: [{ translateY: 6 * (1 - p) }] };
+    });
+
+    const barBorder = useAnimatedStyle(() => ({
+        opacity: prog(scrollY.value, 0, 50),
+    }));
+
+    // Name block shrinks toward its left edge and drifts up toward the bar
+    const nameBlock = useAnimatedStyle(() => {
+        const p = prog(scrollY.value, 0, 120);
+        return {
+            opacity: 1 - p,
+            transform: [{ translateY: -10 * p }, { scale: 1 - 0.12 * p }],
+            transformOrigin: 'left center',
+        };
+    });
+
+    // Avatar (and status dot) shrink toward the top-right corner
+    const avatarBlock = useAnimatedStyle(() => {
+        const y = scrollY.value;
+        const p = prog(y, 0, 130);
+        const overscroll = y < 0 ? Math.min(0.15, -y / 600) : 0; // gentle pull-to-grow
+        return {
+            opacity: 1 - prog(y, 30, 140),
+            transform: [{ translateY: -14 * p }, { scale: 1 + overscroll - 0.5 * p }],
+            transformOrigin: 'right top',
+        };
+    });
+
+    // Tab content stays centered in the *visible* space below the tabs.
+    // As the header collapses and the tabs travel up, the space grows and the
+    // content glides to stay in its middle.
+    const centeredContent = useAnimatedStyle(() => {
+        const s = scrollY.value;
+        const tabsTop = Math.max(topH.value - s, 0); // where the tabs sit on screen
+        const visibleTop = tabsTop + tabsH.value;
+        const centerOnScreen = (visibleTop + viewH.value) / 2;
+        const blockTopOnScreen = topH.value + tabsH.value - s;
+        const y = centerOnScreen - blockTopOnScreen - itemH.value / 2;
+
+        // Stay tucked below the screen edge until there is real room under the tabs,
+        // then rise into place and fade in as the tabs travel up.
+        const space = viewH.value - visibleTop;
+        const start = itemH.value + 20; // not enough room yet -> hidden
+        const end = itemH.value + 160; // plenty of room -> fully revealed
+        const reveal = prog(space, start, end);
+
+        return {
+            opacity: reveal,
+            transform: [{ translateY: Math.max(0, y) + (1 - reveal) * 80 }],
+        };
+    });
+
+    const indicatorStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: indicatorX.value }],
+    }));
+
+    function selectTab(i: number) {
+        setActiveIndex(i);
+        indicatorX.value = withSpring(i * tabW, { damping: 22, stiffness: 240, mass: 0.8 });
+    }
+
+    function toggleRequest(id: string) {
+        setRequested((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
+    }
+
+    function cycleStatus() {
+        setStatusIndex((i) => {
+            if (i === null) return 0;
+            return i + 1 >= STATUSES.length ? null : i + 1;
+        });
+    }
+
+    // Symmetric snap points: the first card rests exactly at the left edge (offset 0)
+    // and the last rests exactly at the right edge (max offset), so both ends behave alike.
+    // Content width = 20 (left pad) + n * (card + 12 gap) + 8 (right pad; last card adds 12 more).
+    const step = CARD_W + 12;
+    const maxOffset = Math.max(0, people.length * step + 28 - width);
+    const snapOffsets: number[] = [];
+    for (let i = 0; i * step < maxOffset - step * 0.3; i++) snapOffsets.push(i * step);
+    snapOffsets.push(maxOffset);
+
+    const tab = TABS[activeIndex];
+    const status = statusIndex === null ? null : STATUSES[statusIndex];
 
     return (
         <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Header */}
-                <View className="flex-row items-center justify-between px-5 py-4">
-                    <Text className="text-2xl font-extrabold text-black">
-                        Profile
-                    </Text>
-                    <Pressable
-                        onPress={() => alert('Settings coming soon!')}
-                        className="h-10 w-10 items-center justify-center rounded-full bg-gray-100"
-                    >
-                        <Ionicons name="settings-outline" size={21} color="#171717" />
+            {/* Fixed top bar */}
+            <View className="h-14 flex-row items-center justify-between px-5">
+                <Pressable
+                    onPress={() => alert('Insights coming soon!')}
+                    hitSlop={10}
+                    className="h-10 w-10 items-start justify-center"
+                >
+                    <Ionicons name="bar-chart-outline" size={25} color={INK} />
+                </Pressable>
+
+                <Animated.Text
+                    style={barTitle}
+                    className="absolute left-0 right-0 text-center text-base font-semibold text-neutral-950"
+                    pointerEvents="none"
+                >
+                    Ravi Pathak
+                </Animated.Text>
+
+                <View className="flex-row items-center">
+                    <Pressable onPress={() => alert('Search coming soon!')} hitSlop={10} className="mr-5">
+                        <Ionicons name="search-outline" size={25} color={INK} />
+                    </Pressable>
+                    <Pressable onPress={() => alert('Settings coming soon!')} hitSlop={10}>
+                        <Ionicons name="settings-outline" size={25} color={INK} />
                     </Pressable>
                 </View>
 
-                {/* User details */}
-                <View className="px-5 pb-5">
-                    <View className="flex-row items-start justify-between">
-                        <View className="flex-1 pr-3">
-                            <Text className="text-2xl font-bold text-gray-950">
-                                Ravi Pathak
-                            </Text>
-                            <Text className="mt-1 text-sm text-gray-500">
-                                @ravi.explores
-                            </Text>
-                            <Text className="mt-4 text-sm leading-6 text-gray-800">
-                                Finding new places, meeting new people and collecting
-                                unforgettable travel stories. 🌍
-                            </Text>
+                <Animated.View
+                    style={barBorder}
+                    className="absolute bottom-0 left-0 right-0 h-px bg-neutral-200"
+                />
+            </View>
+
+            <Animated.ScrollView
+                onScroll={onScroll}
+                scrollEventThrottle={16}
+                showsVerticalScrollIndicator={false}
+                stickyHeaderIndices={[1]}
+                overScrollMode="never"
+                onLayout={(e) => {
+                    viewH.value = e.nativeEvent.layout.height;
+                    setViewHeight(e.nativeEvent.layout.height);
+                }}
+            >
+                {/* 0: Header + suggestions (measured so the fade-out lines up with the tabs) */}
+                <View onLayout={(e) => (topH.value = e.nativeEvent.layout.height)}>
+                    {/* Identity */}
+                    <View className="px-5 pb-1 pt-3">
+                        <View className="flex-row items-start justify-between">
+                            <Animated.View style={nameBlock} className="flex-1 pr-4 pt-3">
+                                <Text className="text-3xl font-bold tracking-tight text-neutral-950">
+                                    Ravi Pathak
+                                </Text>
+                                <Text className="mt-1 text-base text-neutral-400">ravi.explores</Text>
+                                {status && (
+                                    <Text className="mt-2 text-sm text-neutral-500">
+                                        {status.emoji} {status.label}
+                                    </Text>
+                                )}
+                            </Animated.View>
+
+                            <Animated.View style={avatarBlock} className="mr-1">
+                                <Image
+                                    source={{ uri: 'https://i.pravatar.cc/200?img=68' }}
+                                    className="h-24 w-24 rounded-full border border-neutral-200 bg-neutral-100"
+                                />
+                                {/* Status: dashed circle, tap to set */}
+                                <Pressable
+                                    onPress={cycleStatus}
+                                    hitSlop={8}
+                                    accessibilityLabel="Set status"
+                                    className="absolute -left-4 bottom-0 h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-white"
+                                >
+                                    <View
+                                        style={{ borderStyle: 'dashed' }}
+                                        className="h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-neutral-400 bg-neutral-50"
+                                    >
+                                        {status ? (
+                                            <Text style={{ fontSize: 14 }}>{status.emoji}</Text>
+                                        ) : (
+                                            <Ionicons name="add" size={16} color={MUTED} />
+                                        )}
+                                    </View>
+                                </Pressable>
+                            </Animated.View>
                         </View>
 
-                        <Image
-                            source={{ uri: 'https://i.pravatar.cc/150?img=68' }}
-                            className="h-20 w-20 rounded-full bg-gray-100"
-                        />
-                    </View>
-
-                    <View className="mt-4 flex-row items-center">
-                        <Ionicons name="location-outline" size={16} color="#737373" />
-                        <Text className="ml-1 text-sm text-gray-500">
-                            Kolkata, India
-                        </Text>
-                    </View>
-
-                    <View className="mt-4 flex-row items-center">
-                        <Text className="text-sm font-bold text-gray-900">128</Text>
-                        <Text className="ml-1 text-sm text-gray-500">followers</Text>
-                        <Text className="ml-4 text-sm font-bold text-gray-900">86</Text>
-                        <Text className="ml-1 text-sm text-gray-500">following</Text>
-                    </View>
-
-                    <Pressable
-                        onPress={() => alert('Edit profile coming soon!')}
-                        className="mt-5 items-center rounded-full border border-gray-300 py-3"
-                    >
-                        <Text className="font-semibold text-gray-900">Edit profile</Text>
-                    </Pressable>
-                </View>
-
-                {/* Profile tabs */}
-                <View className="flex-row border-b border-gray-100">
-                    {['Posts', 'Replies', 'Media', 'Likes'].map((tab) => (
-                        <Pressable
-                            key={tab}
-                            onPress={() => setActiveTab(tab)}
-                            className="flex-1 items-center py-4"
-                        >
-                            <Text
-                                className={`text-sm ${activeTab === tab
-                                        ? 'font-bold text-black'
-                                        : 'text-gray-400'
-                                    }`}
-                            >
-                                {tab}
+                        <View>
+                            <Text className="mt-4 text-sm leading-6 text-neutral-800">
+                                Finding new places, meeting new people and collecting unforgettable travel stories. 🌍
                             </Text>
+                            <View className="mt-2 flex-row items-center">
+                                <Ionicons name="location-outline" size={15} color={MUTED} />
+                                <Text className="ml-1 text-sm text-neutral-500">Kolkata, India</Text>
+                            </View>
+                            <Text className="mt-3 text-base text-neutral-400">128 connections</Text>
+                        </View>
 
-                            {activeTab === tab && (
-                                <View className="absolute bottom-0 h-0.5 w-10 rounded-full bg-black" />
-                            )}
-                        </Pressable>
-                    ))}
-                </View>
-
-                {/* Empty state */}
-                <View className="items-center px-8 py-16">
-                    <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-                        <Ionicons name="earth-outline" size={32} color="#525252" />
+                        <View className="mb-5 mt-5 flex-row">
+                            <Pressable
+                                onPress={() => alert('Edit profile coming soon!')}
+                                className="mr-3 flex-1 items-center rounded-xl border border-neutral-300 py-3 active:bg-neutral-100"
+                            >
+                                <Text className="text-base font-medium text-neutral-950">Edit profile</Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => alert('Share profile coming soon!')}
+                                className="flex-1 items-center rounded-xl border border-neutral-300 py-3 active:bg-neutral-100"
+                            >
+                                <Text className="text-base font-medium text-neutral-950">Share profile</Text>
+                            </Pressable>
+                        </View>
                     </View>
 
-                    <Text className="text-lg font-bold text-gray-900">
-                        {activeTab === 'Posts'
-                            ? 'Your journey starts here'
-                            : `Your ${activeTab.toLowerCase()} will appear here`}
-                    </Text>
+                    {/* Suggested connections */}
+                    <View className="pb-6 pt-1">
+                        <Text className="mb-3 px-5 text-base font-semibold text-neutral-950">
+                            Suggested for you
+                        </Text>
 
-                    <Text className="mt-2 text-center text-sm leading-5 text-gray-500">
-                        Share your adventures and let other travellers discover your story.
-                    </Text>
+                        {people.length > 0 ? (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                snapToOffsets={snapOffsets}
+                                snapToStart
+                                snapToEnd
+                                decelerationRate="fast"
+                                contentContainerStyle={{ paddingLeft: 20, paddingRight: 8 }}
+                            >
+                                {people.map((p) => (
+                                    <SuggestionCard
+                                        key={p.id}
+                                        person={p}
+                                        requested={requested.includes(p.id)}
+                                        onToggle={() => toggleRequest(p.id)}
+                                        onDismiss={() => setPeople((c) => c.filter((x) => x.id !== p.id))}
+                                    />
+                                ))}
+                            </ScrollView>
+                        ) : (
+                            <Text className="px-5 text-sm text-neutral-500">
+                                You're all caught up. New travellers will show up here.
+                            </Text>
+                        )}
+                    </View>
                 </View>
-            </ScrollView>
+
+                {/* 1: Sticky tabs */}
+                <View
+                    onLayout={(e) => (tabsH.value = e.nativeEvent.layout.height)}
+                    className="border-b border-neutral-200 bg-white"
+                >
+                    <View className="flex-row">
+                        {TABS.map((t, i) => (
+                            <Pressable
+                                key={t.key}
+                                onPress={() => selectTab(i)}
+                                style={{ width: tabW }}
+                                className="items-center py-4"
+                            >
+                                <Text
+                                    className={`text-base ${i === activeIndex ? 'font-semibold text-neutral-950' : 'font-medium text-neutral-400'
+                                        }`}
+                                >
+                                    {t.key}
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </View>
+                    <Animated.View
+                        style={[{ width: tabW, paddingHorizontal: 16 }, indicatorStyle]}
+                        className="absolute bottom-0"
+                    >
+                        <View className="h-0.5 rounded-full bg-neutral-950" />
+                    </Animated.View>
+                </View>
+
+                {/* 2: Tab content. Block height = viewport - tabs, so the tabs can pin exactly at the top. */}
+                <View style={{ height: Math.max(viewHeight - 54, 300) }} className="px-8">
+                    <Animated.View
+                        style={centeredContent}
+                        onLayout={(e) => (itemH.value = e.nativeEvent.layout.height)}
+                        className="items-center"
+                    >
+                        <Pressable
+                            onPress={() => alert('Coming soon!')}
+                            className="rounded-xl border border-neutral-300 px-6 py-3 active:bg-neutral-100"
+                        >
+                            <Text className="text-base font-medium text-neutral-950">{tab.cta}</Text>
+                        </Pressable>
+                        <Text className="mt-4 text-center text-sm text-neutral-400">{tab.hint}</Text>
+                    </Animated.View>
+                </View>
+            </Animated.ScrollView>
         </SafeAreaView>
     );
 }
