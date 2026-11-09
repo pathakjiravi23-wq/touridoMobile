@@ -1,13 +1,9 @@
+import { ProfileNavProvider, useProfileNav } from '@/components/profile/navigation/profile-navigator';
+import SearchProvider, { useSearch } from '@/components/search/search-provider';
+import { useCurrentUser } from '@/data/current-user';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import {
-    Image,
-    Pressable,
-    ScrollView,
-    Text,
-    View,
-    useWindowDimensions,
-} from 'react-native';
+import { Image, Pressable, ScrollView as RNScrollView, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
     Easing,
     LinearTransition,
@@ -48,7 +44,7 @@ const CARD_W = 164;
 function prog(y: number, a: number, b: number) {
     'worklet';
     const t = Math.min(1, Math.max(0, (y - a) / (b - a)));
-    return 1 - Math.pow(1 - t, 3); // ease-out cubic
+    return 1 - Math.pow(1 - t, 3);
 }
 
 function SuggestionCard({
@@ -64,8 +60,6 @@ function SuggestionCard({
 }) {
     return (
         <Animated.View
-            // No enter/exit animation: the dismissed card vanishes instantly,
-            // the rest glide over with a plain timing curve (no spring = no wobble).
             layout={LinearTransition.duration(260).easing(Easing.out(Easing.cubic))}
             style={{ width: CARD_W }}
             className="mr-3 items-center rounded-3xl border border-neutral-200 bg-neutral-50 px-3 pb-3 pt-6"
@@ -105,18 +99,21 @@ function SuggestionCard({
     );
 }
 
-export default function ProfileScreen() {
+function ProfileContent() {
+    const { open: openSearch } = useSearch();
+    const user = useCurrentUser();
     const { width, height } = useWindowDimensions();
+    const nav = useProfileNav();
     const [activeIndex, setActiveIndex] = useState(0);
     const [people, setPeople] = useState(SUGGESTIONS);
     const [requested, setRequested] = useState<string[]>([]);
     const [statusIndex, setStatusIndex] = useState<number | null>(null);
 
     const scrollY = useSharedValue(0);
-    const topH = useSharedValue(700); // height of header + suggestions (where tabs pin)
-    const tabsH = useSharedValue(54); // height of the tab bar
-    const viewH = useSharedValue(height); // visible height of the scroll area
-    const itemH = useSharedValue(90); // height of the centered empty-state item
+    const topH = useSharedValue(700);
+    const tabsH = useSharedValue(54);
+    const viewH = useSharedValue(height);
+    const itemH = useSharedValue(90);
     const [viewHeight, setViewHeight] = useState(height * 0.8);
     const tabW = width / TABS.length;
     const indicatorX = useSharedValue(0);
@@ -125,9 +122,6 @@ export default function ProfileScreen() {
         scrollY.value = e.contentOffset.y;
     });
 
-    // ---- Scroll-linked styles: everything is a continuous function of scrollY ----
-
-    // Top bar title fades/slides in as the big name leaves
     const barTitle = useAnimatedStyle(() => {
         const p = prog(scrollY.value, 70, 150);
         return { opacity: p, transform: [{ translateY: 6 * (1 - p) }] };
@@ -137,7 +131,6 @@ export default function ProfileScreen() {
         opacity: prog(scrollY.value, 0, 50),
     }));
 
-    // Name block shrinks toward its left edge and drifts up toward the bar
     const nameBlock = useAnimatedStyle(() => {
         const p = prog(scrollY.value, 0, 120);
         return {
@@ -147,11 +140,10 @@ export default function ProfileScreen() {
         };
     });
 
-    // Avatar (and status dot) shrink toward the top-right corner
     const avatarBlock = useAnimatedStyle(() => {
         const y = scrollY.value;
         const p = prog(y, 0, 130);
-        const overscroll = y < 0 ? Math.min(0.15, -y / 600) : 0; // gentle pull-to-grow
+        const overscroll = y < 0 ? Math.min(0.15, -y / 600) : 0;
         return {
             opacity: 1 - prog(y, 30, 140),
             transform: [{ translateY: -14 * p }, { scale: 1 + overscroll - 0.5 * p }],
@@ -159,22 +151,17 @@ export default function ProfileScreen() {
         };
     });
 
-    // Tab content stays centered in the *visible* space below the tabs.
-    // As the header collapses and the tabs travel up, the space grows and the
-    // content glides to stay in its middle.
     const centeredContent = useAnimatedStyle(() => {
         const s = scrollY.value;
-        const tabsTop = Math.max(topH.value - s, 0); // where the tabs sit on screen
+        const tabsTop = Math.max(topH.value - s, 0);
         const visibleTop = tabsTop + tabsH.value;
         const centerOnScreen = (visibleTop + viewH.value) / 2;
         const blockTopOnScreen = topH.value + tabsH.value - s;
         const y = centerOnScreen - blockTopOnScreen - itemH.value / 2;
 
-        // Stay tucked below the screen edge until there is real room under the tabs,
-        // then rise into place and fade in as the tabs travel up.
         const space = viewH.value - visibleTop;
-        const start = itemH.value + 20; // not enough room yet -> hidden
-        const end = itemH.value + 160; // plenty of room -> fully revealed
+        const start = itemH.value + 20;
+        const end = itemH.value + 160;
         const reveal = prog(space, start, end);
 
         return {
@@ -203,9 +190,6 @@ export default function ProfileScreen() {
         });
     }
 
-    // Symmetric snap points: the first card rests exactly at the left edge (offset 0)
-    // and the last rests exactly at the right edge (max offset), so both ends behave alike.
-    // Content width = 20 (left pad) + n * (card + 12 gap) + 8 (right pad; last card adds 12 more).
     const step = CARD_W + 12;
     const maxOffset = Math.max(0, people.length * step + 28 - width);
     const snapOffsets: number[] = [];
@@ -232,14 +216,14 @@ export default function ProfileScreen() {
                     className="absolute left-0 right-0 text-center text-base font-semibold text-neutral-950"
                     pointerEvents="none"
                 >
-                    Ravi Pathak
+                    {user.name}
                 </Animated.Text>
 
                 <View className="flex-row items-center">
-                    <Pressable onPress={() => alert('Search coming soon!')} hitSlop={10} className="mr-5">
+                    <Pressable onPress={openSearch} hitSlop={10} accessibilityLabel="Search" className="mr-5">
                         <Ionicons name="search-outline" size={25} color={INK} />
                     </Pressable>
-                    <Pressable onPress={() => alert('Settings coming soon!')} hitSlop={10}>
+                    <Pressable onPress={() => nav.push('settings')} hitSlop={10} accessibilityLabel="Settings">
                         <Ionicons name="settings-outline" size={25} color={INK} />
                     </Pressable>
                 </View>
@@ -261,16 +245,15 @@ export default function ProfileScreen() {
                     setViewHeight(e.nativeEvent.layout.height);
                 }}
             >
-                {/* 0: Header + suggestions (measured so the fade-out lines up with the tabs) */}
+                {/* 0: Header + suggestions */}
                 <View onLayout={(e) => (topH.value = e.nativeEvent.layout.height)}>
-                    {/* Identity */}
                     <View className="px-5 pb-1 pt-3">
                         <View className="flex-row items-start justify-between">
                             <Animated.View style={nameBlock} className="flex-1 pr-4 pt-3">
                                 <Text className="text-3xl font-bold tracking-tight text-neutral-950">
-                                    Ravi Pathak
+                                    {user.name}
                                 </Text>
-                                <Text className="mt-1 text-base text-neutral-400">ravi.explores</Text>
+                                <Text className="mt-1 text-base text-neutral-400">{user.username}</Text>
                                 {status && (
                                     <Text className="mt-2 text-sm text-neutral-500">
                                         {status.emoji} {status.label}
@@ -280,10 +263,9 @@ export default function ProfileScreen() {
 
                             <Animated.View style={avatarBlock} className="mr-1">
                                 <Image
-                                    source={{ uri: 'https://i.pravatar.cc/200?img=68' }}
+                                    source={{ uri: user.avatar }}
                                     className="h-24 w-24 rounded-full border border-neutral-200 bg-neutral-100"
                                 />
-                                {/* Status: dashed circle, tap to set */}
                                 <Pressable
                                     onPress={cycleStatus}
                                     hitSlop={8}
@@ -305,25 +287,48 @@ export default function ProfileScreen() {
                         </View>
 
                         <View>
-                            <Text className="mt-4 text-sm leading-6 text-neutral-800">
-                                Finding new places, meeting new people and collecting unforgettable travel stories. 🌍
+                            <Text className="mt-4 text-sm leading-6 text-neutral-800">{user.bio}</Text>
+
+                            {user.location !== '' && (
+                                <View className="mt-2 flex-row items-center">
+                                    <Ionicons name="location-outline" size={15} color={MUTED} />
+                                    <Text className="ml-1 text-sm text-neutral-500">{user.location}</Text>
+                                </View>
+                            )}
+
+                            {user.interests.length > 0 && (
+                                <View className="mt-3 flex-row flex-wrap">
+                                    {user.interests.map((i) => (
+                                        <View key={i} className="mb-2 mr-2 rounded-full bg-neutral-100 px-3 py-1">
+                                            <Text className="text-xs font-medium text-neutral-700">{i}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
+                            {user.openTo.length > 0 && (
+                                <View className="mt-1 flex-row items-center">
+                                    <Ionicons name="hand-left-outline" size={15} color={MUTED} />
+                                    <Text className="ml-1 text-sm text-neutral-500">
+                                        Open to hosting, guiding and helping
+                                    </Text>
+                                </View>
+                            )}
+
+                            <Text className="mt-3 text-base text-neutral-400">
+                                {user.connections} connections
                             </Text>
-                            <View className="mt-2 flex-row items-center">
-                                <Ionicons name="location-outline" size={15} color={MUTED} />
-                                <Text className="ml-1 text-sm text-neutral-500">Kolkata, India</Text>
-                            </View>
-                            <Text className="mt-3 text-base text-neutral-400">128 connections</Text>
                         </View>
 
                         <View className="mb-5 mt-5 flex-row">
                             <Pressable
-                                onPress={() => alert('Edit profile coming soon!')}
+                                onPress={() => nav.push('edit-profile')}
                                 className="mr-3 flex-1 items-center rounded-xl border border-neutral-300 py-3 active:bg-neutral-100"
                             >
                                 <Text className="text-base font-medium text-neutral-950">Edit profile</Text>
                             </Pressable>
                             <Pressable
-                                onPress={() => alert('Share profile coming soon!')}
+                                onPress={() => nav.push('share-profile')}
                                 className="flex-1 items-center rounded-xl border border-neutral-300 py-3 active:bg-neutral-100"
                             >
                                 <Text className="text-base font-medium text-neutral-950">Share profile</Text>
@@ -338,7 +343,7 @@ export default function ProfileScreen() {
                         </Text>
 
                         {people.length > 0 ? (
-                            <ScrollView
+                            <RNScrollView
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
                                 snapToOffsets={snapOffsets}
@@ -356,7 +361,7 @@ export default function ProfileScreen() {
                                         onDismiss={() => setPeople((c) => c.filter((x) => x.id !== p.id))}
                                     />
                                 ))}
-                            </ScrollView>
+                            </RNScrollView>
                         ) : (
                             <Text className="px-5 text-sm text-neutral-500">
                                 You're all caught up. New travellers will show up here.
@@ -379,7 +384,9 @@ export default function ProfileScreen() {
                                 className="items-center py-4"
                             >
                                 <Text
-                                    className={`text-base ${i === activeIndex ? 'font-semibold text-neutral-950' : 'font-medium text-neutral-400'
+                                    className={`text-base ${i === activeIndex
+                                            ? 'font-semibold text-neutral-950'
+                                            : 'font-medium text-neutral-400'
                                         }`}
                                 >
                                     {t.key}
@@ -395,7 +402,7 @@ export default function ProfileScreen() {
                     </Animated.View>
                 </View>
 
-                {/* 2: Tab content. Block height = viewport - tabs, so the tabs can pin exactly at the top. */}
+                {/* 2: Tab content */}
                 <View style={{ height: Math.max(viewHeight - 54, 300) }} className="px-8">
                     <Animated.View
                         style={centeredContent}
@@ -413,5 +420,15 @@ export default function ProfileScreen() {
                 </View>
             </Animated.ScrollView>
         </SafeAreaView>
+    );
+}
+
+export default function ProfileScreen() {
+    return (
+        <SearchProvider>
+            <ProfileNavProvider>
+                <ProfileContent />
+            </ProfileNavProvider>
+        </SearchProvider>
     );
 }

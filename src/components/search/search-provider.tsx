@@ -39,12 +39,23 @@ export function useSearch() {
 
 const TIMING = { duration: 260, easing: Easing.out(Easing.cubic) };
 
-export default function SearchProvider({ children }: { children: ReactNode }) {
+type Props = {
+    children: ReactNode;
+    /** Pass true while the sidebar drawer is open, so search never opens under it. */
+    isDrawerOpen?: boolean;
+};
+
+export default function SearchProvider({ children, isDrawerOpen = false }: Props) {
     const { width } = useWindowDimensions();
     const progress = useSharedValue(0); // 0 = closed, 1 = open
     const [isOpen, setIsOpen] = useState(false);
 
-    // panel sets this so hardware-back can step "focused page -> home page" first
+    // Mirror the drawer state into a shared value so the UI-thread gesture can read it.
+    const drawerOpenShared = useSharedValue(false);
+    useEffect(() => {
+        drawerOpenShared.value = isDrawerOpen;
+    }, [isDrawerOpen, drawerOpenShared]);
+
     const backRef = useRef<(() => boolean) | null>(null);
 
     const handleClosed = useCallback(() => {
@@ -75,40 +86,28 @@ export default function SearchProvider({ children }: { children: ReactNode }) {
         return () => sub.remove();
     }, [isOpen, close]);
 
-    // Swipe left (from the right side of home) -> open.
-    // Everything runs on the UI thread, so it follows the finger without lag.
+    // Swipe left from the right edge -> open search.
+    // Ignored entirely while the drawer is open, so drawer gestures never leak through.
     const openGesture = Gesture.Pan()
-        .hitSlop({ right: 0, width: 80 })
-        .activeOffsetX(-6)
-        .failOffsetY([-40, 40])
+        .enabled(!isDrawerOpen)
+        .hitSlop({ right: 0, width: 40 })
+        .activeOffsetX(-12)
+        .failOffsetY([-14, 14])
         .onUpdate((e) => {
+            if (drawerOpenShared.value) return;
             progress.value = Math.min(1, Math.max(0, -e.translationX / width));
         })
         .onEnd((e) => {
+            if (drawerOpenShared.value) {
+                progress.value = withTiming(0, TIMING);
+                return;
+            }
             const shouldOpen = progress.value > 0.3 || e.velocityX < -500;
             if (shouldOpen) {
                 scheduleOnRN(setIsOpen, true);
                 progress.value = withTiming(1, TIMING);
             } else {
                 progress.value = withTiming(0, TIMING);
-            }
-        });
-
-    // Swipe right on the panel -> close
-    const closeGesture = Gesture.Pan()
-        .activeOffsetX(8)
-        .failOffsetY([-40, 40])
-        .onUpdate((e) => {
-            progress.value = Math.min(1, Math.max(0, 1 - e.translationX / width));
-        })
-        .onEnd((e) => {
-            const shouldClose = progress.value < 0.7 || e.velocityX > 500;
-            if (shouldClose) {
-                progress.value = withTiming(0, TIMING, (finished) => {
-                    if (finished) scheduleOnRN(handleClosed);
-                });
-            } else {
-                progress.value = withTiming(1, TIMING);
             }
         });
 
@@ -134,24 +133,22 @@ export default function SearchProvider({ children }: { children: ReactNode }) {
                     style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }, dimStyle]}
                 />
 
-                <GestureDetector gesture={closeGesture}>
-                    <Animated.View
-                        pointerEvents={isOpen ? 'auto' : 'none'}
-                        style={[
-                            StyleSheet.absoluteFill,
-                            {
-                                backgroundColor: '#fff',
-                                shadowColor: '#000',
-                                shadowOpacity: 0.15,
-                                shadowRadius: 12,
-                                elevation: 16,
-                            },
-                            panelStyle,
-                        ]}
-                    >
-                        <SearchPanel onClose={close} isOpen={isOpen} backRef={backRef} />
-                    </Animated.View>
-                </GestureDetector>
+                <Animated.View
+                    pointerEvents={isOpen ? 'auto' : 'none'}
+                    style={[
+                        StyleSheet.absoluteFill,
+                        {
+                            backgroundColor: '#fff',
+                            shadowColor: '#000',
+                            shadowOpacity: 0.15,
+                            shadowRadius: 12,
+                            elevation: 16,
+                        },
+                        panelStyle,
+                    ]}
+                >
+                    <SearchPanel onClose={close} isOpen={isOpen} backRef={backRef} />
+                </Animated.View>
             </GestureHandlerRootView>
         </SearchContext.Provider>
     );

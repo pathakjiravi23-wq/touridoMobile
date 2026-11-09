@@ -268,12 +268,19 @@ function HomeContent() {
   );
 }
 
+function HomeWithDrawerState() {
+  const { isOpen: isDrawerOpen } = useDrawer();
+  return (
+    <SearchProvider isDrawerOpen={isDrawerOpen}>
+      <HomeContent />
+    </SearchProvider>
+  );
+}
+
 export default function HomeScreen() {
   return (
-    <SearchProvider>
-      <DrawerProvider drawer={<TravelSidebar />}>
-        <HomeContent />
-      </DrawerProvider>
-    </SearchProvider>
+    <DrawerProvider drawer={<TravelSidebar />}>
+      <HomeWithDrawerState />
+    </DrawerProvider>
   );
 }
