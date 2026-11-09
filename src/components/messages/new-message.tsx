@@ -55,7 +55,10 @@ export default function NewMessageScreen() {
                         user={item}
                         // replace: the search screen is swapped for the chat, so back -> inbox
                         onPress={() =>
-                            router.replace({ pathname: '/messages/chat', params: { id: item.id } })
+                            router.replace({
+                                pathname: '/messages/chat' as any,
+                                params: { id: item.id },
+                            })
                         }
                     />
                 )}
