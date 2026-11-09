@@ -1,56 +1,99 @@
-# Welcome to your Expo app 👋
+# Tourido 🌍
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Tourido** is a public social platform built for travellers, adventurers, and event-goers. It helps people connect through shared travel interests, discover new destinations, organize trips, and build meaningful connections with fellow travellers.
 
-## Get started
+Whether you're planning a road trip, looking for companions to attend an event, hosting a traveller, or discovering beautiful places nearby, Tourido brings the travel community together.
 
-1. Install dependencies
+## ✨ Features
 
-   ```bash
-   npm install
-   ```
+- **Community Feed** – Share travel experiences, publish posts, like content, and interact through comments.
+- **User Profiles** – Create personalized profiles showcasing your interests, travel preferences, and activities.
+- **Open To Options** – Let others know if you're open to hosting travellers, guiding people, joining groups, or helping travellers nearby.
+- **Messaging** – Discover people, search for travellers, and communicate through private chats.
+- **Trips & Events** – Create, discover, plan, and join tours, road trips, parties, and cultural events.
+- **Travel Community** – Connect with like-minded people, exchange recommendations, and explore opportunities together.
 
-2. Start the app
+## 🎥 Demo
 
-   ```bash
-   npx expo start
-   ```
+<!-- Add your project demo video or GIF here -->
 
-In the output, you'll find options to open the app in a
+## 🛠️ Tech Stack
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- React Native
+- Expo
+- TypeScript
+- Expo Router
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 🚀 Getting Started
 
-## Get a fresh project
+### Prerequisites
 
-When you're ready, run:
+- Node.js
+- npm
+- Expo Go or an Android/iOS development environment
+
+### 1. Clone the repository
 
 ```bash
-npm run reset-project
+git clone <your-repository-url>
+cd tourido
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+### 2. Install dependencies
 
-### Other setup steps
+```bash
+npm install
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+### 3. Start the development server
 
-## Learn more
+```bash
+npx expo start
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+### 4. Run the application
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Open the app using:
 
-## Join the community
+- **Expo Go** – Scan the QR code.
+- **Android Emulator** – Press `a` in the terminal.
+- **iOS Simulator** – Press `i` in the terminal (macOS required).
+- **Development Build** – Run using your configured development environment.
 
-Join our community of developers creating universal apps.
+For more information, visit the [Expo documentation](https://docs.expo.dev/).
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 📁 Project Structure
+
+```text
+tourido/
+│
+├── src/
+│   ├── app/                 # Screens and file-based routes
+│   │
+│   ├── components/          # Reusable UI components
+│   │   ├── profile/
+│   │   ├── messages/
+│   │   ├── search/
+│   │   └── sidebar/
+│   │
+│   └── data/                # Shared data, mock data, and stores
+│
+├── assets/                  # Images, fonts, and static assets
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+## 🎯 Project Vision
+
+Tourido aims to make travelling more social, accessible, and community-driven by helping people discover destinations, find travel companions, participate in events, and support fellow travellers.
+
+**Explore places. Meet people. Share experiences. Travel together.**
+
+## 📌 Project Status
+
+Currently under development. More features and improvements are planned.
+
+## 📄 License
+
+This project is currently maintained as a personal project. Licensing details will be added later.
